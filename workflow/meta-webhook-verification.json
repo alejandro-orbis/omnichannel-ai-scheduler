@@ -1,0 +1,162 @@
+{
+  "name": "Meta Webhook Verification",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "omnichannel-webhook",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "872cb8c9-6cb6-475f-9d6b-9010aeb33c7f",
+      "name": "Webhook Verificacion Meta (GET)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -960,
+        112
+      ],
+      "webhookId": "meta-verification-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// VERIFICACION META WEBHOOK\n// Meta envia una peticion GET a tu URL con estos query params:\n//   hub.mode        = \"subscribe\"\n//   hub.verify_token = el token que configuraste en Meta Business\n//   hub.challenge   = string aleatorio que debes devolver\n\nconst input = $input.first().json;\n\n// n8n pone los query params en input.query\nconst query = input.query || {};\nconst mode          = query['hub.mode']         || query.hub_mode         || '';\nconst verifyToken   = query['hub.verify_token'] || query.hub_verify_token || '';\nconst challenge     = query['hub.challenge']    || query.hub_challenge    || '';\n\n// Tu token secreto - configurado en Meta Business y como variable de entorno\nconst myToken = $env.META_VERIFY_TOKEN || '';\n\nif (mode === 'subscribe' && verifyToken === myToken && challenge) {\n  return [{\n    json: {\n      verificacionOk: true,\n      challenge: challenge\n    }\n  }];\n} else {\n  return [{\n    json: {\n      verificacionOk: false,\n      error: 'Token de verificacion incorrecto o mode invalido'\n    }\n  }];\n}\n"
+      },
+      "id": "19fdeb58-16ab-4d51-af56-052950a0b8f6",
+      "name": "Validar Token Verificacion",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -704,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "vc1",
+              "leftValue": "={{ $json.verificacionOk }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "eb00a8ad-d8b1-47dc-9cd4-cbcd44130ffb",
+      "name": "Verificacion Exitosa?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -464,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.challenge }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/plain"
+              }
+            ]
+          }
+        }
+      },
+      "id": "4b1493dc-68b2-4a7d-a6f9-32d7189b7972",
+      "name": "Responder Challenge (200)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ error: 'Forbidden', message: $json.error }) }}",
+        "options": {
+          "responseCode": 403
+        }
+      },
+      "id": "0eaddac8-dc99-4e8b-ac68-db8912b786ac",
+      "name": "Responder 403 Forbidden",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -224,
+        208
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook Verificacion Meta (GET)": {
+      "main": [
+        [
+          {
+            "node": "Validar Token Verificacion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar Token Verificacion": {
+      "main": [
+        [
+          {
+            "node": "Verificacion Exitosa?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificacion Exitosa?": {
+      "main": [
+        [
+          {
+            "node": "Responder Challenge (200)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder 403 Forbidden",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "meta-verification-v1",
+  "meta": {},
+  "id": "meta-webhook-verification",
+  "tags": []
+}
